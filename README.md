@@ -8,9 +8,14 @@ The original study examined the influence of Roman Catholic parishes on the numb
  - Editor Used: RStudio
  - R Version: R 4.4.2 
 
-### ggplot2
-### stargazer
 ### knitr
+This writeup was produced as a Quarto Markdown (.qmd) file, which allows for greater ease of rendering and publishing documents produced in RStudio. The knitr package helped me render the writeup in a neat, concise format as a .pdf file.
+
+### ggplot2
+For the visualizations I produced in this project, I used ggplot2 - namely to track the distribution of drug-related killings across the NCR, and to assess the significance of the relationship between Catholic parish presence and drug-related killings across NCR provinces.
+
+### stargazer
+The stargazer package lets me assemble all of my regression outputs in a concise, tabular format, allowing for ease of interpretation.
 
 ## Bibliography
 If using this work, please cite the original article: Brooke, et al. (2023). Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War. American Journal of Political Science.
