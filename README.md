@@ -19,5 +19,5 @@ The stargazer package lets me assemble all of my regression outputs in a concise
 
 ## Bibliography
 If using this work, please cite the original article:
-Brooke, Steven, David Buckley, Clarissa David, and Ronald Mendoza. 2023. "Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War. American Journal of Political Science 67 (1): 205-220. [https://doi.org/10.1111/ajps.12669](https://doi.org/10.1111/ajps.12669)
 
+Brooke, Steven, David Buckley, Clarissa David, and Ronald Mendoza. 2023. "Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War. American Journal of Political Science 67 (1): 205-220. [https://doi.org/10.1111/ajps.12669](https://doi.org/10.1111/ajps.12669)
