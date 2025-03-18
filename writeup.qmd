@@ -1,0 +1,515 @@
+---
+title: "Predicting Drug-Related Executions during the Philippine Drug War"
+format: pdf
+echo: false
+editor: visual
+---
+
+For this project, I reproduce a negative binomial model from the article [Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War](https://onlinelibrary.wiley.com/doi/abs/10.1111/ajps.12669) (Brooke et al., 2023). Specifically, I aim to reproduce the fourth and most complex model from Table 1 of the paper, on page 213.
+
+## Key Article Information
+
+```{r}
+bbdm <- read.csv("/Users/willdemelo/Downloads/bbdm_drug_war.csv")
+```
+
+The aim of this paper is to evaluate the impact of a Roman Catholic Parish in a National Capital Region (NCR) barangay - the smallest administrative division within the Philippines, equivalent to a village or neighborhood (Wikipedia, 2024) - on the total amount of drug-related killings recorded within that barangay. These killings are attributed to the administration of former Philippine president Rodrigo Duterte, whose *War on Drugs* campaign enabled the Philippine National Police, as well as unknown vigilantes, to execute drug users and dealers (Wikipedia, 2024). By constructing a series of negative binomial models, the researchers aim to describe the correlation between of a Catholic parish's presence and drug-related killings, with the former as an independent variable and the latter as the dependent variable.
+
+## Key Dataset Information
+
+The unit of analysis is each barangay among the 1,696 sampled in this study. Each entry in the dataset lists information pertaining to a single barangay, including the number of drug-related killings reported there up to 2018, geographic location, demographic, political, and religious affinities, and other variables.
+
+The dataset utilized in this study was constructed using a variety of resources, the details of which were found in the article's supplemental codebook. These include:
+
+-   A 2015 census conducted by the Phillipines Statistical Authority, for the geographical placement, demographics, religious distributions, and other details of barangays
+
+-   An archive of data on the War on Drugs from the Ateneo School of Government in Manila, for the distribution of drug-related killings across barangays
+
+-   The Philippines' Department of Interior and Local Government (DILG), as well as the Philippines' Commission on Elections (COMELEC), accessed via the National Citizen's Movement for Free Elections (NAMFREL), for voting distributions at the barangay level
+
+-   The Philippine National Police, for placements of police stations among barangays
+
+-   Diocesan websites of local Philippine regions, as well as information from the Claretian Communications Foundation, Iglesia Ni Cristo (INC), and United Methodist Church concerning placements of Catholic, INC, and Methodist churches among the barangays
+
+Data collection is specifically limited to the NCR because of its advantageous conditions for studying drug-related killings. The NCR has a large population of over 13 million residents, substantive variation in killings among its barangays, and active media coverage of said killings. The researchers also assume regions within the NCR are uniformly impacted by former president Rodrigo's anti-drug rhetoric (Brooke et al., 2023).
+
+### Figure 1
+
+```{r}
+library(ggplot2)
+
+ggplot(data = bbdm, aes(x = killing_count)) + 
+  geom_histogram(binwidth = 1, color="black", fill="gray") +
+   labs(title = "Distribution of Drug-Related Executions in the NCR",
+          subtitle = "Drawn from 1,696 Barangays in 2018",
+          caption = "Bars indicate the number of barangays (y-axis) that have recorded that many killings (x-axis).") +
+  xlab("Amount of Drug-Related Killings") +
+  ylab("Number of Barangays") +
+  theme_minimal()
+```
+
+Figure 1 details the distribution of the amount of killings across all the sampled barangays, where the x-axis demonstrates an amount of drug-related killings experienced by a single single barangay, and the y-axis demonstrates how many barangays recorded that amount. For instance, the left-most bar indicates that around 65% of all barangays within the NCR experienced no drug-related killings. 15% of barangays experienced one, and the remaining 20% experienced more than one. The most amount of killings within a single barangay is 93. This distribution is incredibly right-skewed, and demonstrates potential issues with zero-inflation and over-dispersion.
+
+Of the 1,710 barangays within the NCR (Wikipedia, 2024), 1,696 were included in the data, making the dataset nearly comprehensive. There are no missing values within the data, and no mention of data missingness in the article. Because the researchers constructed the dataset from various sources, and thus had the freedom to pick which barangays to include in their analysis, the lack of missingness is likely by design. The remaining 14 barangays within the NCR may have been excluded on account of having missing data.
+
+Because all barangays are sampled from a near-comprehensive sample of the NCR, observational independence is unlikely given the proximity of the sampled barangays. It is not inconceivable that for a given barangay, variables including the amount of drug-related killings, the presence of a Catholic parish, and support for former president Duterte might be strongly influenced by those of its neighbors.
+
+## Replication of Original Model
+
+### Table 1
+
+```{r, message=FALSE, warning=FALSE, results='asis'}
+library(MASS)
+library(sandwich)
+library(lmtest)
+library(stargazer)
+
+bbdm_nb <- glm.nb(
+  killing_count ~ 
+    rc_dummy + 
+    pct_catholic + 
+    pct_hs_grad + 
+    pct_at_risk_pop + 
+    duterte_share + 
+    enp_sen +
+    police_dummy + 
+    pct_nccp + 
+    methodist_dummy +
+    offset(log(population)), 
+  data = bbdm)
+
+stargazer(title = "Negative Binomial Model for Predicting Killings",
+          bbdm_nb,
+          star.cutoffs = c(0.05, 0.01, 0.001),
+          column.labels = c("Negative Binomial Model"),
+          dep.var.labels = "Killing Count Predictions",
+          covariate.labels = c("Catholic Parish", "Percent Catholic", "Percent HS Grad", "Percent Young Single Men", "Duterte Voteshare", "Political Competition", "Police Sation", "Percent NCCP", "Methodist Church"),
+          header = FALSE,
+          type = "latex",
+          model.names = FALSE)
+```
+
+Model 4 from the original paper describes a negative binomial model with the total drug-related killings at the barangay level as its target variable, where the linear predictor is offset by the log of the population for each barangay. Table 1 demonstrates the output for the reproduced Model 4. For explanatory variables, the model employs:
+
+-   *Catholic Parish,* a dummy variable detailing the presence of a Catholic Parish within a barangay and the primary variable of interest for the article
+
+-   *Percent Catholic,* the percent of the population that is Catholic
+
+-   *Percent HS Grad,* the percent of high school graduates
+
+-   *Percent Young Single Men,* the percent of unmarried men aged 15-24
+
+-   *Duterte Voteshare,* the percentage of votes for former president Duterte in the 2016 election
+
+-   *Political Competition,* a numeric measure of political fragmentation
+
+-   *Police Station,* a dummy variable detailing the presence of a police station
+
+-   *Percent NCCP,* the percent of the population belonging to the National Council of Churches in the Philippines Affiliates
+
+-   *Methodist Church,* a dummy variable detailing the presence of a United Methodist Church location
+
+However, the base Model 4 is not actually reported in the article. Rather, the article presents a modified version with three important changes. First, all coefficients are reported as their exponentiated forms. This is for added ease of interpretation, where the exponentiated coefficients translate to the incidence rate ratios, the amount by which the predicted count is multiplied by when the corresponding explanatory variable is increased by one unit. Additionally, cluster robust standard errors on the municipality of each barangay are applied to adjust the standard error of the coefficients. This is done to account for correlations among killings depending on which municipality the observed barangays are in. Lastly, the intercept term is not reported, owing to a lack of interpretability.
+
+That Model 4's raw output is not reported in the article presents an obstacle to determining whether the reproduced model is the same - and thus, whether the baseline for comparing an alternative model in this analysis is accurate. In order to evaluate the accuracy of the reproduction of Model 4, it must be similarly modified and then compared to its counterpart in the original article.
+
+### Table 2
+
+```{r, results ='asis'}
+library(knitr)
+
+cat("Reproduced (R) vs Original (O) Coefficients and Standard Errors:\n")
+
+cluster_se <- vcovCL(bbdm_nb, cluster = ~ municipality, type = "HC0")
+
+coefs <- coeftest(bbdm_nb, vcov = cluster_se)
+
+expcoefs <- exp(coefs[, 1])
+
+orig_coefs <- c(0, .697, .991, .950, 1.066, .997, 1.128, .926, .819, 1.290)
+
+orig_se <- c(0, .087, .008, .007, .024, .019, .108, .111, .058, .183)
+
+orig_comp <- data.frame(
+  round(expcoefs, 3),
+  orig_coefs,
+  round(coefs[, 2], 3),
+  orig_se,
+  row.names = c("Intercept", "Catholic Parish", "Percent Catholic", "Percent HS Grad", "Percent Young Single Men", "Duterte Voteshare", "Political Competition", "Police Sation", "Percent NCCP", "Methodist Church")
+)
+
+orig_comp$coef_diff <- abs(orig_comp[,1] - orig_comp[,2])
+
+orig_comp$se_diff <- abs(orig_comp[,3] - orig_comp[,4])
+
+colnames(orig_comp) <- c("Coefs (R)", "Coefs (O)", "SE (R)", "SE (O)", "Coef Difference", "SE Difference")
+
+kable(orig_comp[2:10, ], format = "latex", booktabs = TRUE)
+```
+
+```{r, results='asis'}
+coef_comp <- data.frame(
+  c(
+    max(abs(orig_comp[2:10,1] - orig_comp[2:10,2])),
+    max(abs(orig_comp[2:10,3] - orig_comp[2:10,4]))
+    ),
+  c(
+    round(mean(abs(orig_comp[2:10,1] - orig_comp[2:10,2])), 3),
+    round(mean(abs(orig_comp[2:10,3] - orig_comp[2:10,4])), 3)
+    ),
+  row.names = c("Coefficients", "Standard Errors")
+)
+
+colnames(coef_comp) <- c("Maximum Difference", "Average Difference")
+
+kable(coef_comp, format = "latex", booktabs = TRUE)
+```
+
+Table 2 demonstrates the discrepancies between the modified reproduced model and the modified original model outputs. They are similar, but not exactly alike, as evidenced by the slight differences in the coefficients and standard errors. This may be due to the difference in optimizers utilized for negative binomial regression in R as opposed to Stata, with which the original models were trained. The largest difference between the original and reproduced exponentiated coefficients is .054, with an average difference of .01; for the standard errors, the largest difference is .046, and the average difference is .014. These slight differences seem unobtrusive to the purpose of finding a model with greater fit, and accurately represent the data. Even if the outputs are not exactly similar, all steps within the .do file from the original study were followed, and the reproduced model reports the same significant variables as does the original.
+
+## Proposing an Alternative Model
+
+In creating an alternative model to the original created by the authors, I first deliberated on whether I should alter the type of model. The dependent variable - the number of killings in a given barangay - is count data, so my selection is limited to count models. In turn, the effectiveness of count models is dependent on the data itself; particularly in terms of whether the data is over-dispersed or zero-inflated. To assess these characteristics, I created a simple poisson variation of the original model and tested it.
+
+```{r}
+bbdm_poi <- glm(
+  killing_count ~ 
+    rc_dummy + 
+    pct_catholic + 
+    pct_hs_grad + 
+    pct_at_risk_pop + 
+    duterte_share + 
+    enp_sen +
+    police_dummy + 
+    pct_nccp + 
+    methodist_dummy +
+    offset(log(population)), 
+  data = bbdm,
+  family = 'poisson')
+
+library('performance')
+# check_overdispersion(bbdm_poi)
+# check_zeroinflation(bbdm_poi)
+```
+
+From the results of an over-dispersion test, it seems that there is over-dispersion, which justifies the original authors' use of a negative binomial model. Additionally, despite roughly two thirds of the barangays having no recorded drug-related killings, zero-inflation seems not to pose a problem; the poisson model was able to predict 1055 out of 1107 zeroes in the data. These insights further limit the scope of alternative model types that can be used. Given that zero-inflation is not a problem, neither a hurdle nor a zero-inflated negative binomial model is justifiable.
+
+A quasi-poisson model might also be suitable, but a side-by-side comparison of the original model and its quasi-poisson counterpart would be difficult to interpret. This is because a quasi-poisson model does not produce a likelihood (and by extension does not produce an AIC or BIC). This would leave an empirical test - of evaluating the in and out-of-sample performance - the only way to evaluate whether the quasi-poisson model would be preferable to the negative binomial model.
+
+Given that the type of model is already ideal, the explanatory variables may still warrant altering. There are two options available; removal of non-significant, unimpactful factors or addition of potentially important factors. Therefore, three alternative models are proposed; a model in which all non-significant explanatory variables are removed, a model in which an additional categorical variable is added which denotes the province in which each barangay is located, and a model where both changes are employed in tandem.
+
+Removal of certain factors may improve the model fit. The AIC, as a model diagnostic, is based on both the log-likelihood of the model and the number of parameters it employs. Removal of certain non-significant factors may ameliorate the AIC while presenting a more concise negative binomial model.
+
+Addition of a geographical factor makes sense intuitively, but only outside of the original authors' intentions. The authors constructed their model to evaluate and describe the impact of factors specific to their hypotheses on casualties of the Philippine drug war, and in their analysis, they use a variable for municpalities to construct cluster robust standard errors. My goal, on the other hand, is to find ways to increase the model fit and produce as accurate a prediction as possible; therefore, I choose to directly incorporate geographic data into the model. In this case, the fourth district of the NCR is treated as the reference category.
+
+Lastly, a third model that combines these approaches will ideally present a significant factor in provinces while shaving off unnecessary factors to balance the AIC, given the addition of several new dummy variables.
+
+## Alternative Model Comparisons
+
+```{r}
+bbdm_nb_lim <- glm.nb(
+  killing_count ~ 
+    rc_dummy +
+    pct_hs_grad + 
+    pct_at_risk_pop + 
+    enp_sen +
+    pct_nccp +
+    offset(log(population)), 
+  data = bbdm)
+
+bbdm_nb_ext <- glm.nb(
+  killing_count ~ 
+    rc_dummy + 
+    pct_catholic + 
+    pct_hs_grad + 
+    pct_at_risk_pop + 
+    duterte_share + 
+    enp_sen +
+    police_dummy + 
+    methodist_dummy +
+    province +
+    offset(log(population)), 
+  data = bbdm)
+
+bbdm_nb_both <- glm.nb(
+  killing_count ~ 
+    rc_dummy +
+    pct_hs_grad + 
+    pct_at_risk_pop + 
+    enp_sen +
+    province +
+    offset(log(population)), 
+  data = bbdm)
+```
+
+```{r, message=FALSE, warning=FALSE, results='asis'}
+# stargazer(title = "Total Killing Regression Comparisons",
+#           bbdm_nb,
+#           bbdm_nb_lim,
+#           bbdm_nb_ext,
+#           bbdm_nb_both,
+#           star.cutoffs = c(0.05, 0.01, 0.001),
+#           column.labels = c("NB (Original)", "Limited NB", "Extended NB", "Extended-Limited NB"),
+#           dep.var.labels = "Killing Count Predictions",
+#           covariate.labels = c("Catholic Parish", "Percent Catholic", "Percent HS Grad", "Percent Young Single Men", "Duterte Voteshare", "Political Competition", "Police Sation", "Percent NCCP", "Methodist Church", "NCR, Manila", "NCR, Second District", "NCR, Third District", "Taguig, Pateros"),
+#           type = "text",
+#           header = FALSE,
+#           model.names = FALSE,
+#           column.sep.width = "3pt")
+```
+
+From left to right of Table 3, the tabulated models are: the original negative binomial model, the limited negative binomial which removes non-significant factors, the extended negative binomial that includes province data, and the extended negative binomial missing the same factors as the limited negative binomial (the extended-limited model). The poisson model constructed earlier is not included; due to its unsuitability for over-dispersed count data, performs the worse out of all the models by far.
+
+Viewing the collected models together, I first evaluate the models by comparing their AICs. The least AIC, corresponding to the greatest fit, comes from the extended-limited model at 3,937.601. Intuitively this makes sense; incorporation of geographical data allows the model to account for the effect of proximity on drug-related killings. Furthermore, because the AIC penalizes models based on the number of factors utilized, removing certain explanatory variables in order to account for the added dummy variables helps offset the additional penalties incurred by the extended model. Interestingly, in the extended-limited model, the coefficient for Catholic parishes is not significant, as opposed to the prior models, especially the original.
+
+### Table 3
+
+```{r, echo=FALSE, out.width="90%", fig.align="center"}
+knitr::include_graphics("regression_table.png")
+```
+
+### Table 4
+
+```{r, results='asis'}
+cat("Log-likelihood Comparisons between Original model and Alternative Models\n")
+
+orig_llk <- logLik(bbdm_nb)
+
+lim_llk <- logLik(bbdm_nb_lim)
+
+ext_llk <- logLik(bbdm_nb_ext)
+
+both_llk <- logLik(bbdm_nb_both)
+
+lr <- 2 * diff(c(as.numeric(lim_llk), as.numeric(orig_llk)))
+lrp_lim <- 1 - pchisq(lr, df = 4)
+
+lr <- 2 * diff(c(as.numeric(orig_llk), as.numeric(ext_llk)))
+lrp_ext <- 1 - pchisq(lr, df = 3)
+
+lr <- 2 * diff(c(as.numeric(orig_llk), as.numeric(both_llk)))
+lrp_both <- 1 - pchisq(lr, df = 1)
+
+p_comp <- data.frame(
+  as.numeric(c(orig_llk, lim_llk, ext_llk, both_llk)),
+  c(11, 7, 14, 10),
+  round(c(1, lrp_lim, lrp_ext, lrp_both), 3),
+  row.names = c("NB (Original)", "Limited NB", "Extended NB", "Extended-Limited NB")
+)
+
+colnames(p_comp) <- c("Log-Likelihoods", "Degrees of Freedom", "LR Test p-value")
+
+kable(p_comp, format = "latex", booktabs = TRUE)
+
+```
+
+In terms of log-likelihoods, the extended model has the greatest log-likelihood out of all the models, slightly beating that of the extended-limited model. Comparing each model to the original using the likelihood ratio test, the results of which are reported in Table 4, it can be seen that the limited model does not exhibit a significant difference from the original model in terms of fit, but the extended and extended-limited models do. In fact, despite exhibiting a lower log-likelihood than the extended model, the extended-limited model demonstrates a more significant difference from the original model in terms of fit based on the p-value.
+
+## In/Out-of-Sample Testing
+
+To further evaluate whether the extended-limited model is in fact a better predictor of killings than the original model, I employ 5-fold cross validation to evaluate in and out-of-sample performance of both models.
+
+```{r}
+bbdm_nb_in = c()
+
+bbdm_nb_out = c()
+
+bbdm_nb_both_in = c()
+
+bbdm_nb_both_out = c()
+
+set.seed(1234)
+
+bbdm_sh <- bbdm[sample(nrow(bbdm)), ]
+
+
+ind <- seq(from = 1, to = nrow(bbdm_sh))
+
+folds <- cut(x = ind, breaks=5, labels = FALSE)
+
+for(i in 1:5){
+  
+    testind <- which(folds==i, arr.ind = TRUE)
+    
+    train_bbdm <- bbdm_sh[-testind, ]
+    
+    test_bbdm <- bbdm_sh[testind, ]
+    
+    bbdm_nb_train <- glm.nb(
+      killing_count ~ 
+      rc_dummy + 
+      pct_catholic + 
+      pct_hs_grad + 
+      pct_at_risk_pop + 
+      duterte_share + 
+      enp_sen +
+      police_dummy + 
+      pct_nccp + 
+      methodist_dummy +
+      offset(log(population)), 
+      data = train_bbdm)
+    
+    bbdm_nb_both_train <- glm.nb(
+      killing_count ~ 
+      rc_dummy +
+      pct_hs_grad + 
+      pct_at_risk_pop + 
+      enp_sen +
+      province +
+      offset(log(population)), 
+      data = train_bbdm)
+    
+    bbdm_nb_in[[length(bbdm_nb_in)+1]] <- mean((train_bbdm$killing_count - predict(bbdm_nb_train, newdata = train_bbdm, type = "response"))^2)
+    
+    bbdm_nb_out[[length(bbdm_nb_out)+1]] <- mean((test_bbdm$killing_count - predict(bbdm_nb_train, newdata = test_bbdm, type = "response"))^2)
+    
+    bbdm_nb_both_in[[length(bbdm_nb_both_in)+1]] <- mean((train_bbdm$killing_count - predict(bbdm_nb_both_train, newdata = train_bbdm, type = "response"))^2)
+    
+    bbdm_nb_both_out[[length(bbdm_nb_both_out)+1]] <- mean((test_bbdm$killing_count - predict(bbdm_nb_both_train, newdata = test_bbdm, type = "response"))^2)
+}
+```
+
+### Table 5
+
+```{r, results='asis'}
+cat("In/Out-of-sample MSEs of Original vs Extended-Limited Model:\n")
+
+in_out_comp <- data.frame(
+  c(round(mean(as.numeric(bbdm_nb_in)), 3), round(mean(as.numeric(bbdm_nb_both_in)), 3)),
+  c(round(mean(as.numeric(bbdm_nb_out)), 3), round(mean(as.numeric(bbdm_nb_both_out)), 3)),
+  row.names = c("Original Model", "Extended-Limited Model")
+)
+
+colnames(in_out_comp) <- c("In-sample MSE", "Out-of-sample MSE")
+
+kable(in_out_comp, format = "latex", booktabs = TRUE)
+```
+
+Table 5 demonstrates the average in-sample and out-of-sample mean squared errors of the predictions made by the original model and the extended-limited model. Relative to the original model, the extended-limited model exhibits slightly greater in-sample MSE, but much lesser out-of-sample MSE. Empirically it seems that the extended-limited model is much more robust. This lends support to the notion that the extended-limited model has a greater quality of fit and is better suited to predicting data it was not trained on.
+
+## Evaluating a Quantity of Interest
+
+The original authors endeavored to assess the impact of a barangay having a Catholic parish in terms of drug-related killings. Now that unnecessary explanatory variables have been removed, and provincial data added, I am interested in seeing the effect of a Catholic parish on drug-related killings specific to each of the five provinces data was collected from.
+
+### Figure 2
+
+```{r}
+par <- numeric(5)
+nopar <- numeric(5)
+par_se <- numeric(5)
+nopar_se <- numeric(5)
+
+
+provinces <- list(
+  bbdm[bbdm$province == 'NATIONAL CAPITAL REGION - FOURTH DISTRICT',],
+  bbdm[bbdm$province == 'NATIONAL CAPITAL REGION - MANILA',],
+  bbdm[bbdm$province == 'NATIONAL CAPITAL REGION - SECOND DISTRICT',],
+  bbdm[bbdm$province == 'NATIONAL CAPITAL REGION - THIRD DISTRICT',],
+  bbdm[bbdm$province == 'TAGUIG - PATEROS',]
+)
+
+for(i in 1:5) {
+    province_data <- provinces[[i]]
+
+    X_par <- setNames(c(1, 1, mean(bbdm$pct_hs_grad), mean(bbdm$pct_at_risk_pop), mean(bbdm$enp_sen), 0, 0, 0, 0),
+                      names(bbdm_nb_both$coefficients))
+    X_nopar <- setNames(c(1, 0, mean(bbdm$pct_hs_grad), mean(bbdm$pct_at_risk_pop), mean(bbdm$enp_sen), 0, 0, 0, 0),
+                        names(bbdm_nb_both$coefficients))
+
+    if(i >= 2) {
+      X_par[4 + i] <- 1
+      X_nopar[4 + i] <- 1
+    }
+
+    aligned_X_par <- X_par[names(bbdm_nb_both$coefficients)]
+    aligned_X_nopar <- X_nopar[names(bbdm_nb_both$coefficients)]
+
+    eta_par <- sum(bbdm_nb_both$coefficients * aligned_X_par) + log(mean(province_data$population))
+    eta_nopar <- sum(bbdm_nb_both$coefficients * aligned_X_nopar) + log(mean(province_data$population))
+
+    se_eta_par <- sqrt(t(aligned_X_par) %*% vcov(bbdm_nb_both) %*% aligned_X_par)
+    se_eta_nopar <- sqrt(t(aligned_X_nopar) %*% vcov(bbdm_nb_both) %*% aligned_X_nopar)
+
+    par[i] <- exp(eta_par)
+    nopar[i] <- exp(eta_nopar)
+    
+    par_se[i] <- exp(eta_par) * se_eta_par
+    nopar_se[i] <- exp(eta_nopar) * se_eta_nopar
+}
+```
+
+```{r, fig.width=8, fig.height=6, fig.align="center"}
+library(ggplot2)
+
+geo = c("NCR, 4th District", "NCR, Manila", "NCR, 2nd District", "NCR, 3rd District", "Taguig, Pateros")
+
+geo_comp <- data.frame(
+  pred_kill = append(par, nopar),
+  par = c(rep("Yes", 5), rep("No", 5)),
+  se = append(par_se, nopar_se),
+  geo = append(geo, geo)
+)
+
+ggplot(geo_comp, aes(geo, pred_kill, fill = factor(par))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = pred_kill - (1.96 * se), ymax = pred_kill + (1.96 * se)), width=.2, position=position_dodge(.9)) +
+  labs(title = "Predicted Drug-Related Killings for Barangays with or without Catholic Parishes",
+          subtitle = "Predicted across five Philippine provinces",
+          caption = "Overlap of confidence intervals indicates non-significant difference") +
+  xlab("Province") +
+  ylab("Average Predicted Killings") +
+  labs(fill = "Catholic Parish Presence") +
+  scale_fill_manual(values=c("Yes" = "#ab1b1b", "No" = "#221bab")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+To do this, I construct a function which iterates through subsets of the data specific to each of the provinces. For each province, the function stores the predicted counts of the extended-limited negative binomial model for two scenarios - a barangay which is average in every way among the data collected in that province, with at least one Catholic parish, and a barangay that is the same but does not have a parish. For instance, the scenarios used for Manila are constructed using the average Manilan percentages of high school graduates, at-risk youths, and political fractionialization, and only differ in the sense that one has a parish and the other does not.
+
+These predicted counts are then displayed in Figure 2 as a bar chart to demonstrate the impact that having a Catholic parish has on a barangay. In all of the districts, the model predicts less killings when there is a Catholic parish present. However, there is significant overlap from the 95% confidence intervals, displayed via the error bars, between the predicted killings among scenarios for each province. Using a series of t-tests outlined in Table 6, we find that there are no significant differences between the predictions.
+
+The Pateros municipality of Taguig appears to exhibit the largest confidence intervals, owing to the fact that only 38 barangays from it were sampled. Conversely, 888 barangays were sampled from Manila, leading to the smallest confidence intervals. The model also seems to predict that the most amount of killings might occur in the 2nd District or in Pateros, and the fewest in Manila.
+
+### Table 6
+
+```{r, results = 'asis'}
+cat("Two-tailed z-tests for Predicted Killings across Provinces:\n")
+
+test_significance <- function(par, nopar, par_se, nopar_se) {
+  Z <- (par - nopar) / sqrt(par_se^2 + nopar_se^2)
+  p_value <- 2 * (1 - pnorm(abs(Z)))
+  return(p_value)
+}
+
+p_values <- mapply(test_significance, par, nopar, par_se, nopar_se)
+
+significance_results <- data.frame(
+  Province = c("NCR, 4th District", "NCR, Manila", "NCR, 2nd District", "NCR 3rd District", "Taguig, Pateros"),
+  par = round(par, 3), 
+  par_se = round(par_se, 3), 
+  nopar = round(nopar, 3), 
+  nopar_se = round(nopar_se, 3), 
+  p_value = round(p_values, 3)
+)
+
+colnames(significance_results) <- c("Province", "Estimate (parish)", "SE (parish)", "Estimate (sans parish)", "SE (sans parish)", "p-value")
+
+kable(significance_results, format = "latex", booktabs = TRUE)
+```
+
+## Conclusions
+
+The original authors concluded that "the presence of a Catholic parish correlates with less drug war violence (Brooke et al., 2023, 217)." This stands in contrast to what my model suggests in Figure 2; that across all five provinces, there are no significant differences among the predicted killings based on the presence of a Catholic parish alone.\
+\
+This is not to say that the original researchers failed in any regard. Although I created a model with greater fit and out-of-sample performance, the authors' goal was only to evaluate whether a significant correlation existed between parishes and executions, and to that end I believe they succeeded. The authors utilized their model as a tool to find the significance of a correlation between a count variable and an indicator variable, and certainly accomplished as much. That they suggest these findings provide evidence towards their hypothesis that churches deter drug-related executions in the NCR is a valid point.
+
+However, I will say that there are two major benefits to incorporating visualizations like Figure 4 within papers like this one. The first is that visualizations are beneficial for readers. They convey insight in a way that is easier to understand and more memorable than a regression output. They reinforce one's memory and allow ideas to take a greater significance because they are easier to think about when conveyed through illustration. The other benefit is that using scenarios gives a sense of practicality to one's insights. If there is indeed a significant effect of having a Catholic parish on drug-related violence, it should be visible when expressed in a graph using reasonably constructed scenarios. Interpretation through scenarios adds a layer of nuance to one's insights that is not conveyed through p-values alone. If I had one suggestion for the original authors, it would be to incorporate visualizations based on scenarios.
+
+## References
+
+“Barangay.” 2024. *Wikipedia*. <https://en.wikipedia.org/wiki/Barangay> (accessed March 14, 2025).
+
+Brooke, Steven, David Buckley, Clarissa David, and Ronald Mendoza. 2023. "Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War. *American Journal of Political Science* 67 (1): 205-220. <https://doi.org/10.1111/ajps.12669>
+
+"List of barangays of Metro Manila." 2024. *Wikipedia.* <https://en.wikipedia.org/wiki/List_of_barangays_of_Metro_Manila> (accessed March 14, 2025).
+
+“Philippine Drug War.” 2024. *Wikipedia*. <https://en.wikipedia.org/wiki/Philippine_Drug_War> (accessed March 14, 2025).
