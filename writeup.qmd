@@ -7,10 +7,20 @@ editor: visual
 
 For this project, I reproduce a negative binomial model from the article [Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War](https://onlinelibrary.wiley.com/doi/abs/10.1111/ajps.12669) (Brooke et al., 2023). Specifically, I aim to reproduce the fourth and most complex model from Table 1 of the paper, on page 213.
 
+```{r, include=FALSE}
+# Key packages
+library(tidyverse)
+library(MASS)
+library(sandwich)
+library(lmtest)
+library(stargazer)
+library(knitr)
+```
+
 ## Key Article Information
 
 ```{r}
-bbdm <- read.csv("/Users/willdemelo/Downloads/bbdm_drug_war.csv")
+bbdm <- read.csv("./bbdm_drug_war.csv")
 ```
 
 The aim of this paper is to evaluate the impact of a Roman Catholic Parish in a National Capital Region (NCR) barangay - the smallest administrative division within the Philippines, equivalent to a village or neighborhood (Wikipedia, 2024) - on the total amount of drug-related killings recorded within that barangay. These killings are attributed to the administration of former Philippine president Rodrigo Duterte, whose *War on Drugs* campaign enabled the Philippine National Police, as well as unknown vigilantes, to execute drug users and dealers (Wikipedia, 2024). By constructing a series of negative binomial models, the researchers aim to describe the correlation between of a Catholic parish's presence and drug-related killings, with the former as an independent variable and the latter as the dependent variable.
@@ -35,17 +45,48 @@ Data collection is specifically limited to the NCR because of its advantageous c
 
 ### Figure 1
 
-```{r}
-library(ggplot2)
-
+```{r, fig.width=6, fig.height=4, fig.align="center"}
 ggplot(data = bbdm, aes(x = killing_count)) + 
-  geom_histogram(binwidth = 1, color="black", fill="gray") +
+  geom_histogram(binwidth = 1, color="black", fill = "#3182bd") +
    labs(title = "Distribution of Drug-Related Executions in the NCR",
           subtitle = "Drawn from 1,696 Barangays in 2018",
           caption = "Bars indicate the number of barangays (y-axis) that have recorded that many killings (x-axis).") +
   xlab("Amount of Drug-Related Killings") +
   ylab("Number of Barangays") +
   theme_minimal()
+```
+
+```{r, fig.width=8, fig.height=6, fig.align="center"}
+bbdm <- bbdm %>%
+  mutate(killing_group = case_when(
+    killing_count == 0 ~ "0 killings",
+    killing_count == 1 ~ "1 killing",
+    killing_count >= 2 & killing_count <= 5 ~ "2–5 killings",
+    killing_count > 5 ~ ">5 killings"
+  ))
+
+killings_summary <- bbdm %>%
+  group_by(killing_group) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = round(count / sum(count) * 100, 1),
+         label = paste0(killing_group, " (", percentage, "%)"))
+
+killings_summary$killing_group <- factor(
+  killings_summary$killing_group,
+  levels = c("0 killings", "1 killing", "2–5 killings", ">5 killings")
+)
+
+ggplot(killings_summary, aes(x = "", y = count, fill = killing_group)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y") +
+  theme_void() +
+  labs(title = "Distribution of Drug-Related Killings per Barangay", fill = "Number of drug-related killings") +
+  scale_fill_manual(values = c(
+  ">5 killings"     = "#d73027",
+  "2–5 killings"    = "#fc8d59",
+  "1 killing"       = "#91bfdb",
+  "0 killings"      = "#e0f3f8"
+))
 ```
 
 Figure 1 details the distribution of the amount of killings across all the sampled barangays, where the x-axis demonstrates an amount of drug-related killings experienced by a single single barangay, and the y-axis demonstrates how many barangays recorded that amount. For instance, the left-most bar indicates that around 65% of all barangays within the NCR experienced no drug-related killings. 15% of barangays experienced one, and the remaining 20% experienced more than one. The most amount of killings within a single barangay is 93. This distribution is incredibly right-skewed, and demonstrates potential issues with zero-inflation and over-dispersion.
@@ -59,11 +100,6 @@ Because all barangays are sampled from a near-comprehensive sample of the NCR, o
 ### Table 1
 
 ```{r, message=FALSE, warning=FALSE, results='asis'}
-library(MASS)
-library(sandwich)
-library(lmtest)
-library(stargazer)
-
 bbdm_nb <- glm.nb(
   killing_count ~ 
     rc_dummy + 
@@ -116,8 +152,6 @@ That Model 4's raw output is not reported in the article presents an obstacle to
 ### Table 2
 
 ```{r, results ='asis'}
-library(knitr)
-
 cat("Reproduced (R) vs Original (O) Coefficients and Standard Errors:\n")
 
 cluster_se <- vcovCL(bbdm_nb, cluster = ~ municipality, type = "HC0")
@@ -142,7 +176,7 @@ orig_comp$coef_diff <- abs(orig_comp[,1] - orig_comp[,2])
 
 orig_comp$se_diff <- abs(orig_comp[,3] - orig_comp[,4])
 
-colnames(orig_comp) <- c("Coefs (R)", "Coefs (O)", "SE (R)", "SE (O)", "Coef Difference", "SE Difference")
+colnames(orig_comp) <- c("Coefs (R)", "Coefs (O)", "SE (R)", "SE (O)", "Coef Diff.", "SE Diff.")
 
 kable(orig_comp[2:10, ], format = "latex", booktabs = TRUE)
 ```
@@ -242,22 +276,6 @@ bbdm_nb_both <- glm.nb(
   data = bbdm)
 ```
 
-```{r, message=FALSE, warning=FALSE, results='asis'}
-# stargazer(title = "Total Killing Regression Comparisons",
-#           bbdm_nb,
-#           bbdm_nb_lim,
-#           bbdm_nb_ext,
-#           bbdm_nb_both,
-#           star.cutoffs = c(0.05, 0.01, 0.001),
-#           column.labels = c("NB (Original)", "Limited NB", "Extended NB", "Extended-Limited NB"),
-#           dep.var.labels = "Killing Count Predictions",
-#           covariate.labels = c("Catholic Parish", "Percent Catholic", "Percent HS Grad", "Percent Young Single Men", "Duterte Voteshare", "Political Competition", "Police Sation", "Percent NCCP", "Methodist Church", "NCR, Manila", "NCR, Second District", "NCR, Third District", "Taguig, Pateros"),
-#           type = "text",
-#           header = FALSE,
-#           model.names = FALSE,
-#           column.sep.width = "3pt")
-```
-
 From left to right of Table 3, the tabulated models are: the original negative binomial model, the limited negative binomial which removes non-significant factors, the extended negative binomial that includes province data, and the extended negative binomial missing the same factors as the limited negative binomial (the extended-limited model). The poisson model constructed earlier is not included; due to its unsuitability for over-dispersed count data, performs the worse out of all the models by far.
 
 Viewing the collected models together, I first evaluate the models by comparing their AICs. The least AIC, corresponding to the greatest fit, comes from the extended-limited model at 3,937.601. Intuitively this makes sense; incorporation of geographical data allows the model to account for the effect of proximity on drug-related killings. Furthermore, because the AIC penalizes models based on the number of factors utilized, removing certain explanatory variables in order to account for the added dummy variables helps offset the additional penalties incurred by the extended model. Interestingly, in the extended-limited model, the coefficient for Catholic parishes is not significant, as opposed to the prior models, especially the original.
@@ -265,7 +283,27 @@ Viewing the collected models together, I first evaluate the models by comparing 
 ### Table 3
 
 ```{r, echo=FALSE, out.width="90%", fig.align="center"}
-knitr::include_graphics("regression_table.png")
+# knitr::include_graphics("regression_table.png")
+```
+
+```{r, echo=FALSE, results='asis', message=FALSE, warning=FALSE, }
+stargazer(
+  title = "Total Killing Regression Comparisons",
+  bbdm_nb,
+  bbdm_nb_lim,
+  bbdm_nb_ext,
+  bbdm_nb_both,
+  star.cutoffs = c(0.05, 0.01, 0.001),
+  column.labels = c("NB (Original)", "Limited NB", "Extended NB", "Extended-Limited NB"),
+  dep.var.labels = "Killing Count Predictions",
+  covariate.labels = c("Catholic Parish", "Percent Catholic", "Percent HS Grad", "Percent At-Risk Youth", "Duterte Voteshare", "Political Competition", "Police Station", "Percent NCCP", "Methodist Church", "NCR, Manila", "NCR, 2nd Dist.", "NCR, 3rd Dist.", "Taguig, Pateros"),
+  type = "latex",
+  header = FALSE,
+  model.names = FALSE,
+  column.sep.width = "1pt",
+  omit = "Constant",
+  font.size = "footnotesize"
+)
 ```
 
 ### Table 4
@@ -321,7 +359,6 @@ bbdm_nb_both_out = c()
 set.seed(1234)
 
 bbdm_sh <- bbdm[sample(nrow(bbdm)), ]
-
 
 ind <- seq(from = 1, to = nrow(bbdm_sh))
 
@@ -385,6 +422,24 @@ colnames(in_out_comp) <- c("In-sample MSE", "Out-of-sample MSE")
 kable(in_out_comp, format = "latex", booktabs = TRUE)
 ```
 
+```{r, fig.width=8, fig.height=6, fig.align="center"}
+ioc_long <- in_out_comp %>%
+  rownames_to_column(var = "Model") %>%
+  pivot_longer(cols = c("In-sample MSE", "Out-of-sample MSE"),
+               names_to = "Type",
+               values_to = "Value")
+
+ggplot(ioc_long, aes(x = Model, y = Value, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "In-Sample vs. Out-of-Sample Mean Squared Error by Model",
+       caption = "Compared between edited model (left) and original model (right)",
+       fill = "Model Type") +
+  xlab("MSE") +
+  ylab("Model Type") +
+  scale_fill_manual(values = c("In-sample MSE" = "#91bfdb", "Out-of-sample MSE" = "#4575b4")) +
+  theme_minimal()
+```
+
 Table 5 demonstrates the average in-sample and out-of-sample mean squared errors of the predictions made by the original model and the extended-limited model. Relative to the original model, the extended-limited model exhibits slightly greater in-sample MSE, but much lesser out-of-sample MSE. Empirically it seems that the extended-limited model is much more robust. This lends support to the notion that the extended-limited model has a greater quality of fit and is better suited to predicting data it was not trained on.
 
 ## Evaluating a Quantity of Interest
@@ -439,8 +494,6 @@ for(i in 1:5) {
 ```
 
 ```{r, fig.width=8, fig.height=6, fig.align="center"}
-library(ggplot2)
-
 geo = c("NCR, 4th District", "NCR, Manila", "NCR, 2nd District", "NCR, 3rd District", "Taguig, Pateros")
 
 geo_comp <- data.frame(
@@ -459,7 +512,7 @@ ggplot(geo_comp, aes(geo, pred_kill, fill = factor(par))) +
   xlab("Province") +
   ylab("Average Predicted Killings") +
   labs(fill = "Catholic Parish Presence") +
-  scale_fill_manual(values=c("Yes" = "#ab1b1b", "No" = "#221bab")) +
+  scale_fill_manual(values=c("Yes" = "#e15759", "No" = "#4e79a7")) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -491,7 +544,7 @@ significance_results <- data.frame(
   p_value = round(p_values, 3)
 )
 
-colnames(significance_results) <- c("Province", "Estimate (parish)", "SE (parish)", "Estimate (sans parish)", "SE (sans parish)", "p-value")
+colnames(significance_results) <- c("Province", "Estimate (parish)", "SE (parish)", "Estimate (-parish)", "SE (-parish)", "p-value")
 
 kable(significance_results, format = "latex", booktabs = TRUE)
 ```
