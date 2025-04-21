@@ -5,7 +5,11 @@ echo: false
 editor: visual
 ---
 
+
+
 For this project, I reproduce a negative binomial model from the article [Religious Protection from Populist Violence: The Catholic Church and the Philippine Drug War](https://onlinelibrary.wiley.com/doi/abs/10.1111/ajps.12669) (Brooke et al., 2023). Specifically, I aim to reproduce the fourth and most complex model from Table 1 of the paper, on page 213. This project's materials can be viewed on its [Github page](https://github.com/willdemelo/Predicting_Philippine_Drug_Violence).
+
+
 
 ```{r, include=FALSE}
 # Key packages
@@ -17,11 +21,17 @@ library(stargazer)
 library(knitr)
 ```
 
+
+
 ## Key Article Information
+
+
 
 ```{r}
 bbdm <- read.csv("./bbdm_drug_war.csv")
 ```
+
+
 
 The aim of this paper is to evaluate the impact of a Roman Catholic Parish in a National Capital Region (NCR) barangay - the smallest administrative division within the Philippines, equivalent to a village or neighborhood (Wikipedia, 2024) - on the total amount of drug-related killings recorded within that barangay. These killings are attributed to the administration of former Philippine president Rodrigo Duterte, whose *War on Drugs* campaign enabled the Philippine National Police, as well as unknown vigilantes, to execute drug users and dealers (Wikipedia, 2024). By constructing a series of negative binomial models, the researchers aim to describe the correlation between a Catholic parish's presence and drug-related killings, with the former as an independent variable and the latter as the dependent variable.
 
@@ -42,6 +52,8 @@ The dataset utilized in this study was constructed using a variety of resources,
 -   Diocesan websites of local Philippine regions, as well as information from the Claretian Communications Foundation, Iglesia Ni Cristo (INC), and United Methodist Church concerning placements of Catholic, INC, and Methodist churches among the barangays
 
 Data collection is specifically limited to the NCR because of its advantageous conditions for studying drug-related killings. The NCR has a large population of over 13 million residents, substantive variation in killings among its barangays, and active media coverage of said killings. The researchers also assume regions within the NCR are uniformly impacted by former president Rodrigo's anti-drug rhetoric (Brooke et al., 2023).
+
+
 
 ```{r, fig.width=6, fig.height=4, fig.align="center"}
 ggplot(data = bbdm, aes(x = killing_count)) + 
@@ -89,6 +101,8 @@ ggplot(killings_summary, aes(x = "", y = count, fill = killing_group)) +
 ))
 ```
 
+
+
 Figure 1 details the distribution of the amount of killings across all the sampled barangays, where the x-axis demonstrates an amount of drug-related killings experienced by a single barangay, and the y-axis demonstrates how many barangays recorded that amount. Figure 2 describes the distribution in terms of proportions; for instance, around 65% of all barangays within the NCR experienced no drug-related killings, 15% of barangays experienced one, and the remaining 20% experienced more than one. The most amount of killings within a single barangay is 93. This distribution is incredibly right-skewed, and demonstrates potential issues with zero-inflation and over-dispersion.
 
 Of the 1,710 barangays within the NCR (Wikipedia, 2024), 1,696 were included in the data, making the dataset nearly comprehensive. There are no missing values within the data, and no mention of data missingness in the article. Because the researchers constructed the dataset from various sources, and thus had the freedom to pick which barangays to include in their analysis, the lack of missingness is likely by design. The remaining 14 barangays within the NCR may have been excluded on account of having missing data.
@@ -96,6 +110,8 @@ Of the 1,710 barangays within the NCR (Wikipedia, 2024), 1,696 were included in 
 Because all barangays are sampled from a near-comprehensive sample of the NCR, observational independence is unlikely given the proximity of the sampled barangays. It is not inconceivable that for a given barangay, variables including the amount of drug-related killings, the presence of a Catholic parish, and support for former president Duterte might be strongly influenced by those of its neighbors.
 
 ## Replication of Original Model
+
+
 
 ```{r, message=FALSE, warning=FALSE, results='asis'}
 bbdm_nb <- glm.nb(
@@ -123,6 +139,8 @@ stargazer(title = "Negative Binomial Model for Predicting Killings",
           model.names = FALSE)
 ```
 
+
+
 Model 4 from the original paper describes a negative binomial model with the total drug-related killings at the barangay level as its target variable, where the linear predictor is offset by the log of the population for each barangay. Table 1 demonstrates the output for the reproduced Model 4. For explanatory variables, the model employs:
 
 -   *Catholic Parish,* a dummy variable detailing the presence of a Catholic Parish within a barangay and the primary variable of interest for the article
@@ -146,6 +164,8 @@ Model 4 from the original paper describes a negative binomial model with the tot
 However, the base Model 4 is not actually reported in the article. Rather, the article presents a modified version with three important changes. First, all coefficients are reported as their exponentiated forms. This is for added ease of interpretation, where the exponentiated coefficients translate to the incidence rate ratios, the amount by which the predicted count is multiplied by when the corresponding explanatory variable is increased by one unit. Additionally, cluster robust standard errors are applied by municipality to adjust the standard error of the coefficients. This is done to account for correlations among killings depending on which municipality the observed barangays are in. Lastly, the intercept term is not reported, owing to a lack of interpretability.
 
 That Model 4's raw output is not reported in the article presents an obstacle to determining whether the reproduced model is the same - and thus, whether the baseline for comparing an alternative model in this analysis is accurate. In order to evaluate the accuracy of the reproduction of Model 4, it must be similarly modified and then compared to its counterpart in the original article.
+
+
 
 ```{r, results ='asis'}
 cat("Reproduced (R) vs Original (O) Coefficients and Standard Errors:\n")
@@ -195,11 +215,15 @@ colnames(coef_comp) <- c("Maximum Difference", "Average Difference")
 kable(coef_comp, format = "latex", booktabs = TRUE)
 ```
 
+
+
 The above table demonstrates the discrepancies between the modified reproduced model and the modified original model outputs. They are similar, but not exactly alike, as evidenced by the slight differences in the coefficients and standard errors. This may be due to the difference in optimizers utilized for negative binomial regression in R as opposed to Stata, with which the original models were trained. The largest difference between the original and reproduced exponentiated coefficients is .054, with an average difference of .01; for the standard errors, the largest difference is .046, and the average difference is .014. These slight differences seem unobtrusive to the purpose of finding a model with greater fit, and accurately represent the data. Even if the outputs are not exactly similar, all steps within the .do file from the original study were followed, and the reproduced model reports the same significant variables as does the original.
 
 ## Proposing an Alternative Model
 
 In creating an alternative model to the original created by the authors, I first deliberated on whether I should alter the type of model. The dependent variable - the number of killings in a given barangay - is count data, so my selection is limited to count models. In turn, the effectiveness of count models is dependent on the data itself; particularly in terms of whether the data is over-dispersed or zero-inflated. To assess these characteristics, I created a simple poisson variation of the original model and tested it.
+
+
 
 ```{r}
 bbdm_poi <- glm(
@@ -222,6 +246,8 @@ library('performance')
 # check_zeroinflation(bbdm_poi)
 ```
 
+
+
 From the results of an over-dispersion test, it seems that there is over-dispersion, which justifies the original authors' use of a negative binomial model. Additionally, despite roughly two thirds of the barangays having no recorded drug-related killings, zero-inflation seems not to pose a problem; the poisson model was able to predict 1055 out of 1107 zeroes in the data. These insights further limit the scope of alternative model types that can be used. Given that zero-inflation is not a problem, neither a hurdle nor a zero-inflated negative binomial model is justifiable.
 
 A quasi-poisson model might also be suitable, but a side-by-side comparison of the original model and its quasi-poisson counterpart would be difficult to interpret. This is because a quasi-poisson model does not produce a likelihood (and by extension does not produce an AIC or BIC). This would leave an empirical test - of evaluating the in and out-of-sample performance - the only way to evaluate whether the quasi-poisson model would be preferable to the negative binomial model.
@@ -235,6 +261,8 @@ Addition of a geographical factor makes sense intuitively, but only outside of t
 Lastly, a third model that combines these approaches will ideally present a significant factor in provinces while shaving off unnecessary factors to balance the AIC, given the addition of several new dummy variables.
 
 ## Alternative Model Comparisons
+
+
 
 ```{r}
 bbdm_nb_lim <- glm.nb(
@@ -292,9 +320,13 @@ stargazer(
 )
 ```
 
+
+
 From left to right of Table 2, the tabulated models are: the original negative binomial model, the limited negative binomial which removes non-significant factors, the extended negative binomial that includes province data, and the extended negative binomial missing the same factors as the limited negative binomial (the extended-limited model). The poisson model constructed earlier is not included; due to its unsuitability for over-dispersed count data, performs the worse out of all the models by far.
 
 Viewing the collected models together, I first evaluate the models by comparing their AICs. The least AIC, corresponding to the greatest fit, comes from the extended-limited model at 3,937.601. Intuitively this makes sense; incorporation of geographical data allows the model to account for the effect of proximity on drug-related killings. Furthermore, because the AIC penalizes models based on the number of factors utilized, removing certain explanatory variables in order to account for the added dummy variables helps offset the additional penalties incurred by the extended model. Interestingly, in the extended-limited model, the coefficient for Catholic parishes is not significant, as opposed to the prior models, especially the original.
+
+
 
 ```{r, results='asis'}
 cat("Log-likelihood Comparisons between Original model and Alternative Models\n")
@@ -329,11 +361,15 @@ kable(p_comp, format = "latex", booktabs = TRUE)
 
 ```
 
+
+
 In terms of log-likelihoods, the extended model has the greatest log-likelihood out of all the models, slightly beating that of the extended-limited model. Comparing each model to the original using the likelihood ratio test, the results of which are reported in the above table, it can be seen that the limited model does not exhibit a significant difference from the original model in terms of fit, but the extended and extended-limited models do. In fact, despite exhibiting a lower log-likelihood than the extended model, the extended-limited model demonstrates a more significant difference from the original model in terms of fit based on the p-value.
 
 ## In/Out-of-Sample Testing
 
 To further evaluate whether the extended-limited model is in fact a better predictor of killings than the original model, I employ 5-fold cross validation to evaluate in and out-of-sample performance of both models.
+
+
 
 ```{r}
 bbdm_nb_in = c()
@@ -426,11 +462,15 @@ ggplot(ioc_long, aes(x = Model, y = Value, fill = Type)) +
   theme_minimal()
 ```
 
+
+
 Figure 3 demonstrates the average in-sample and out-of-sample mean squared errors of the predictions made by the original model and the extended-limited model. Relative to the original model, the extended-limited model exhibits slightly greater in-sample MSE, but much lesser out-of-sample MSE. Empirically it seems that the extended-limited model is much more robust. This lends support to the notion that the extended-limited model has a greater quality of fit and is better suited to predicting data it was not trained on.
 
 ## Evaluating a Quantity of Interest
 
 The original authors endeavored to assess the impact of a barangay having a Catholic parish in terms of drug-related killings. Now that unnecessary explanatory variables have been removed, and provincial data added, I am interested in seeing the effect of a Catholic parish on drug-related killings specific to each of the five provinces data was collected from.
+
+
 
 ```{r}
 par <- numeric(5)
@@ -500,11 +540,15 @@ ggplot(geo_comp, aes(geo, pred_kill, fill = factor(par))) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+
+
 To do this, I construct a function which iterates through subsets of the data specific to each of the provinces. For each province, the function stores the predicted counts of the extended-limited negative binomial model for two scenarios - a barangay which is average in every way among the data collected in that province, with at least one Catholic parish, and a barangay that is the same but does not have a parish. For instance, the scenarios used for Manila are constructed using the average Manilan percentages of high school graduates, at-risk youths, and political fractionialization, and only differ in the sense that one has a parish and the other does not.
 
 These predicted counts are then displayed in Figure 4 as a bar chart to demonstrate the impact that having a Catholic parish has on a barangay. In all of the districts, the model predicts less killings when there is a Catholic parish present. However, there is significant overlap from the 95% confidence intervals, displayed via the error bars, between the predicted killings among scenarios for each province. Using a series of t-tests, I find that there are no significant differences between the predictions.
 
 The Pateros municipality of Taguig appears to exhibit the largest confidence intervals, owing to the fact that only 38 barangays from it were sampled. Conversely, 888 barangays were sampled from Manila, leading to the smallest confidence intervals. The model also seems to predict that the most amount of killings might occur in the 2nd District or in Pateros, and the fewest in Manila.
+
+
 
 ```{r, results = 'asis'}
 cat("Two-tailed z-tests for Predicted Killings across Provinces:\n")
@@ -531,6 +575,8 @@ colnames(significance_results) <- c("Province", "Estimate (parish)", "SE (parish
 kable(significance_results, format = "latex", booktabs = TRUE)
 ```
 
+
+
 ## Conclusions
 
 The original authors concluded that "the presence of a Catholic parish correlates with less drug war violence (Brooke et al., 2023, 217)." This stands in contrast to what my model suggests in Figure 4; that across all five provinces, there are no significant differences among the predicted killings based on the presence of a Catholic parish alone.\
@@ -549,6 +595,9 @@ Brooke, Steven, David Buckley, Clarissa David, and Ronald Mendoza. 2023. "Religi
 
 “Philippine Drug War.” 2024. *Wikipedia*. <https://en.wikipedia.org/wiki/Philippine_Drug_War> (accessed March 14, 2025).
 
+
+
 ```{r}
 sessionInfo()
 ```
+
