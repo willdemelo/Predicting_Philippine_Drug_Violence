@@ -56,6 +56,8 @@ ggplot(data = bbdm, aes(x = killing_count)) +
   theme_minimal()
 ```
 
+### Figure 2
+
 ```{r, fig.width=8, fig.height=6, fig.align="center"}
 bbdm <- bbdm %>%
   mutate(killing_group = case_when(
@@ -75,7 +77,9 @@ killings_summary$killing_group <- factor(
   killings_summary$killing_group,
   levels = c("0 killings", "1 killing", "2–5 killings", ">5 killings")
 )
+```
 
+```{r}
 ggplot(killings_summary, aes(x = "", y = count, fill = killing_group)) +
   geom_bar(width = 1, stat = "identity", color = "white") +
   coord_polar("y") +
@@ -89,15 +93,13 @@ ggplot(killings_summary, aes(x = "", y = count, fill = killing_group)) +
 ))
 ```
 
-Figure 1 details the distribution of the amount of killings across all the sampled barangays, where the x-axis demonstrates an amount of drug-related killings experienced by a single single barangay, and the y-axis demonstrates how many barangays recorded that amount. For instance, the left-most bar indicates that around 65% of all barangays within the NCR experienced no drug-related killings. 15% of barangays experienced one, and the remaining 20% experienced more than one. The most amount of killings within a single barangay is 93. This distribution is incredibly right-skewed, and demonstrates potential issues with zero-inflation and over-dispersion.
+Figures 1 and 2 details the distribution of the amount of killings across all the sampled barangays, where the x-axis demonstrates an amount of drug-related killings experienced by a single single barangay, and the y-axis demonstrates how many barangays recorded that amount. For instance, the left-most bar indicates that around 65% of all barangays within the NCR experienced no drug-related killings. 15% of barangays experienced one, and the remaining 20% experienced more than one. The most amount of killings within a single barangay is 93. This distribution is incredibly right-skewed, and demonstrates potential issues with zero-inflation and over-dispersion.
 
 Of the 1,710 barangays within the NCR (Wikipedia, 2024), 1,696 were included in the data, making the dataset nearly comprehensive. There are no missing values within the data, and no mention of data missingness in the article. Because the researchers constructed the dataset from various sources, and thus had the freedom to pick which barangays to include in their analysis, the lack of missingness is likely by design. The remaining 14 barangays within the NCR may have been excluded on account of having missing data.
 
 Because all barangays are sampled from a near-comprehensive sample of the NCR, observational independence is unlikely given the proximity of the sampled barangays. It is not inconceivable that for a given barangay, variables including the amount of drug-related killings, the presence of a Catholic parish, and support for former president Duterte might be strongly influenced by those of its neighbors.
 
 ## Replication of Original Model
-
-### Table 1
 
 ```{r, message=FALSE, warning=FALSE, results='asis'}
 bbdm_nb <- glm.nb(
@@ -148,8 +150,6 @@ Model 4 from the original paper describes a negative binomial model with the tot
 However, the base Model 4 is not actually reported in the article. Rather, the article presents a modified version with three important changes. First, all coefficients are reported as their exponentiated forms. This is for added ease of interpretation, where the exponentiated coefficients translate to the incidence rate ratios, the amount by which the predicted count is multiplied by when the corresponding explanatory variable is increased by one unit. Additionally, cluster robust standard errors on the municipality of each barangay are applied to adjust the standard error of the coefficients. This is done to account for correlations among killings depending on which municipality the observed barangays are in. Lastly, the intercept term is not reported, owing to a lack of interpretability.
 
 That Model 4's raw output is not reported in the article presents an obstacle to determining whether the reproduced model is the same - and thus, whether the baseline for comparing an alternative model in this analysis is accurate. In order to evaluate the accuracy of the reproduction of Model 4, it must be similarly modified and then compared to its counterpart in the original article.
-
-### Table 2
 
 ```{r, results ='asis'}
 cat("Reproduced (R) vs Original (O) Coefficients and Standard Errors:\n")
@@ -276,17 +276,15 @@ bbdm_nb_both <- glm.nb(
   data = bbdm)
 ```
 
-From left to right of Table 3, the tabulated models are: the original negative binomial model, the limited negative binomial which removes non-significant factors, the extended negative binomial that includes province data, and the extended negative binomial missing the same factors as the limited negative binomial (the extended-limited model). The poisson model constructed earlier is not included; due to its unsuitability for over-dispersed count data, performs the worse out of all the models by far.
+From left to right of the above table, the tabulated models are: the original negative binomial model, the limited negative binomial which removes non-significant factors, the extended negative binomial that includes province data, and the extended negative binomial missing the same factors as the limited negative binomial (the extended-limited model). The poisson model constructed earlier is not included; due to its unsuitability for over-dispersed count data, performs the worse out of all the models by far.
 
 Viewing the collected models together, I first evaluate the models by comparing their AICs. The least AIC, corresponding to the greatest fit, comes from the extended-limited model at 3,937.601. Intuitively this makes sense; incorporation of geographical data allows the model to account for the effect of proximity on drug-related killings. Furthermore, because the AIC penalizes models based on the number of factors utilized, removing certain explanatory variables in order to account for the added dummy variables helps offset the additional penalties incurred by the extended model. Interestingly, in the extended-limited model, the coefficient for Catholic parishes is not significant, as opposed to the prior models, especially the original.
-
-### Table 3
 
 ```{r, echo=FALSE, out.width="90%", fig.align="center"}
 # knitr::include_graphics("regression_table.png")
 ```
 
-```{r, echo=FALSE, results='asis', message=FALSE, warning=FALSE, }
+```{r, echo=FALSE, results='asis', message=FALSE, warning=FALSE}
 stargazer(
   title = "Total Killing Regression Comparisons",
   bbdm_nb,
@@ -305,8 +303,6 @@ stargazer(
   font.size = "footnotesize"
 )
 ```
-
-### Table 4
 
 ```{r, results='asis'}
 cat("Log-likelihood Comparisons between Original model and Alternative Models\n")
@@ -341,7 +337,7 @@ kable(p_comp, format = "latex", booktabs = TRUE)
 
 ```
 
-In terms of log-likelihoods, the extended model has the greatest log-likelihood out of all the models, slightly beating that of the extended-limited model. Comparing each model to the original using the likelihood ratio test, the results of which are reported in Table 4, it can be seen that the limited model does not exhibit a significant difference from the original model in terms of fit, but the extended and extended-limited models do. In fact, despite exhibiting a lower log-likelihood than the extended model, the extended-limited model demonstrates a more significant difference from the original model in terms of fit based on the p-value.
+In terms of log-likelihoods, the extended model has the greatest log-likelihood out of all the models, slightly beating that of the extended-limited model. Comparing each model to the original using the likelihood ratio test, the results of which are reported in the above table, it can be seen that the limited model does not exhibit a significant difference from the original model in terms of fit, but the extended and extended-limited models do. In fact, despite exhibiting a lower log-likelihood than the extended model, the extended-limited model demonstrates a more significant difference from the original model in terms of fit based on the p-value.
 
 ## In/Out-of-Sample Testing
 
@@ -406,8 +402,6 @@ for(i in 1:5){
 }
 ```
 
-### Table 5
-
 ```{r, results='asis'}
 cat("In/Out-of-sample MSEs of Original vs Extended-Limited Model:\n")
 
@@ -440,13 +434,13 @@ ggplot(ioc_long, aes(x = Model, y = Value, fill = Type)) +
   theme_minimal()
 ```
 
-Table 5 demonstrates the average in-sample and out-of-sample mean squared errors of the predictions made by the original model and the extended-limited model. Relative to the original model, the extended-limited model exhibits slightly greater in-sample MSE, but much lesser out-of-sample MSE. Empirically it seems that the extended-limited model is much more robust. This lends support to the notion that the extended-limited model has a greater quality of fit and is better suited to predicting data it was not trained on.
+The above table demonstrates the average in-sample and out-of-sample mean squared errors of the predictions made by the original model and the extended-limited model. Relative to the original model, the extended-limited model exhibits slightly greater in-sample MSE, but much lesser out-of-sample MSE. Empirically it seems that the extended-limited model is much more robust. This lends support to the notion that the extended-limited model has a greater quality of fit and is better suited to predicting data it was not trained on.
 
 ## Evaluating a Quantity of Interest
 
 The original authors endeavored to assess the impact of a barangay having a Catholic parish in terms of drug-related killings. Now that unnecessary explanatory variables have been removed, and provincial data added, I am interested in seeing the effect of a Catholic parish on drug-related killings specific to each of the five provinces data was collected from.
 
-### Figure 2
+### Figure 3
 
 ```{r}
 par <- numeric(5)
@@ -518,11 +512,9 @@ ggplot(geo_comp, aes(geo, pred_kill, fill = factor(par))) +
 
 To do this, I construct a function which iterates through subsets of the data specific to each of the provinces. For each province, the function stores the predicted counts of the extended-limited negative binomial model for two scenarios - a barangay which is average in every way among the data collected in that province, with at least one Catholic parish, and a barangay that is the same but does not have a parish. For instance, the scenarios used for Manila are constructed using the average Manilan percentages of high school graduates, at-risk youths, and political fractionialization, and only differ in the sense that one has a parish and the other does not.
 
-These predicted counts are then displayed in Figure 2 as a bar chart to demonstrate the impact that having a Catholic parish has on a barangay. In all of the districts, the model predicts less killings when there is a Catholic parish present. However, there is significant overlap from the 95% confidence intervals, displayed via the error bars, between the predicted killings among scenarios for each province. Using a series of t-tests outlined in Table 6, we find that there are no significant differences between the predictions.
+These predicted counts are then displayed in Figure 3 as a bar chart to demonstrate the impact that having a Catholic parish has on a barangay. In all of the districts, the model predicts less killings when there is a Catholic parish present. However, there is significant overlap from the 95% confidence intervals, displayed via the error bars, between the predicted killings among scenarios for each province. Using a series of t-tests outlined in the above table, we find that there are no significant differences between the predictions.
 
 The Pateros municipality of Taguig appears to exhibit the largest confidence intervals, owing to the fact that only 38 barangays from it were sampled. Conversely, 888 barangays were sampled from Manila, leading to the smallest confidence intervals. The model also seems to predict that the most amount of killings might occur in the 2nd District or in Pateros, and the fewest in Manila.
-
-### Table 6
 
 ```{r, results = 'asis'}
 cat("Two-tailed z-tests for Predicted Killings across Provinces:\n")
@@ -551,11 +543,9 @@ kable(significance_results, format = "latex", booktabs = TRUE)
 
 ## Conclusions
 
-The original authors concluded that "the presence of a Catholic parish correlates with less drug war violence (Brooke et al., 2023, 217)." This stands in contrast to what my model suggests in Figure 2; that across all five provinces, there are no significant differences among the predicted killings based on the presence of a Catholic parish alone.\
+The original authors concluded that "the presence of a Catholic parish correlates with less drug war violence (Brooke et al., 2023, 217)." This stands in contrast to what my model suggests in Figure 3; that across all five provinces, there are no significant differences among the predicted killings based on the presence of a Catholic parish alone.\
 \
 This is not to say that the original researchers failed in any regard. Although I created a model with greater fit and out-of-sample performance, the authors' goal was only to evaluate whether a significant correlation existed between parishes and executions, and to that end I believe they succeeded. The authors utilized their model as a tool to find the significance of a correlation between a count variable and an indicator variable, and certainly accomplished as much. That they suggest these findings provide evidence towards their hypothesis that churches deter drug-related executions in the NCR is a valid point.
-
-However, I will say that there are two major benefits to incorporating visualizations like Figure 4 within papers like this one. The first is that visualizations are beneficial for readers. They convey insight in a way that is easier to understand and more memorable than a regression output. They reinforce one's memory and allow ideas to take a greater significance because they are easier to think about when conveyed through illustration. The other benefit is that using scenarios gives a sense of practicality to one's insights. If there is indeed a significant effect of having a Catholic parish on drug-related violence, it should be visible when expressed in a graph using reasonably constructed scenarios. Interpretation through scenarios adds a layer of nuance to one's insights that is not conveyed through p-values alone. If I had one suggestion for the original authors, it would be to incorporate visualizations based on scenarios.
 
 ## References
 
@@ -566,3 +556,7 @@ Brooke, Steven, David Buckley, Clarissa David, and Ronald Mendoza. 2023. "Religi
 "List of barangays of Metro Manila." 2024. *Wikipedia.* <https://en.wikipedia.org/wiki/List_of_barangays_of_Metro_Manila> (accessed March 14, 2025).
 
 “Philippine Drug War.” 2024. *Wikipedia*. <https://en.wikipedia.org/wiki/Philippine_Drug_War> (accessed March 14, 2025).
+
+```{r}
+sessionInfo()
+```
